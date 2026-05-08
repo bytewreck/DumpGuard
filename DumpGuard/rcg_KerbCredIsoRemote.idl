@@ -1,0 +1,381 @@
+import "rcg_BaseTypes.idl";
+import "rcg_RemoteGuardCallIds.idl";
+
+typedef long long KEY_AGREEMENT_HANDLE;
+
+typedef struct {
+    unsigned int Pdu;
+    unsigned int Length;
+    [size_is(Length)] char* Asn1Buffer;
+} KERBISO_ASN1_DATA;
+
+typedef struct {
+    short NameType;
+    unsigned short NameCount;
+    [size_is(NameCount)] IUM_UNICODE_STRING* Names;
+} KERBISO_INTERNAL_NAME;
+
+typedef struct {
+    int PreauthDataType;
+    IUM_OCTET_STRING PreauthData;
+} KERBISO_PA_DATA;
+
+typedef struct {
+    int ArmorType;
+    IUM_OCTET_STRING ArmorValue;
+} KERBISO_FAST_ARMOR;
+
+typedef struct {
+    IUM_UNICODE_STRING PackageName;
+    unsigned int CredentialSize;
+    [size_is(CredentialSize)] char* Credentials;
+} SECPKG_SUPPLEMENTAL_CRED, *PSECPKG_SUPPLEMENTAL_CRED;
+
+typedef struct {
+    unsigned int CredentialCount;
+    [size_is(CredentialCount)] SECPKG_SUPPLEMENTAL_CRED Credentials[*];
+} SECPKG_SUPPLEMENTAL_CRED_ARRAY, *PSECPKG_SUPPLEMENTAL_CRED_ARRAY;
+
+typedef struct {
+    [ignore] void* CredIsoObj;
+    int KeyType;
+    IUM_OCTET_STRING KeyValue;
+} KERBISO_REMOTE_ENCRYPTION_KEY, *PKERBISO_REMOTE_ENCRYPTION_KEY;
+
+[
+    //uuid(2cb7a1ea-8fe2-47ef-afb9-fa78216b4e44),
+    version(1.0)
+]
+interface KerbCredIsoRemote
+{
+    typedef struct _KerbCredIsoRemoteInput
+    {
+        RemoteGuardCallId CallId;
+
+        [switch_type(RemoteGuardCallId), switch_is(CallId)] union
+        {
+            [case(RemoteCallKerbNegotiateVersion)] struct {
+                unsigned int MaxSupportedVersion;
+            } NegotiateVersion;
+
+            // Create an AS_REQ message authenticator.
+            [case(RemoteCallKerbBuildAsReqAuthenticator)] struct {
+                KERBISO_REMOTE_ENCRYPTION_KEY* EncryptionKey;
+                KERBISO_REMOTE_ENCRYPTION_KEY* ArmorKey; // optional
+                IUM_LARGE_INTEGER* TimeSkew;
+            } BuildAsReqAuthenticator;
+
+            // Verify that the given service ticket is valid within the given skew. The encrypted part of the reply data is decrypted for the caller.
+            [case(RemoteCallKerbVerifyServiceTicket)] struct {
+                KERBISO_ASN1_DATA* PackedTicket;
+                KERBISO_REMOTE_ENCRYPTION_KEY* ServiceKey;
+                IUM_LARGE_INTEGER* TimeSkew; // optional
+            } VerifyServiceTicket;
+
+            // Create an authenticator for an KRB_AP_REQ message.
+            [case(RemoteCallKerbCreateApReqAuthenticator)] struct {
+                KERBISO_REMOTE_ENCRYPTION_KEY* EncryptionKey;
+                unsigned int SequenceNumber;
+                KERBISO_INTERNAL_NAME* ClientName;
+                PIUM_UNICODE_STRING ClientRealm;
+                IUM_LARGE_INTEGER* SkewTime;
+                KERBISO_REMOTE_ENCRYPTION_KEY* SubKey; // optional
+                KERBISO_ASN1_DATA* AuthData; // optional
+                KERBISO_ASN1_DATA* GssChecksum; // optional
+                unsigned int KeyUsage;
+            } CreateApReqAuthenticator;
+
+            // Decrypt the encrypted part of an AP_REP.
+            [case(RemoteCallKerbDecryptApReply)] struct {
+                KERBISO_ASN1_DATA* EncryptedReply;
+                KERBISO_REMOTE_ENCRYPTION_KEY* Key;
+            } DecryptApReply;
+
+            // Decrypt the encrypted part of a KRB_KDC_REP from the KDC. The type of reply is indicated by the PDU – either encrypted AS_REPLY PDU or encrypted 
+            // TGS_REPLY PDU. Key usage allows the caller to specify either the TGS or AS REP key derivation types. This is done to allow back-compatibility
+            // with a previous server release which returned the wrong PDU for an AS_REP. 
+            [case(RemoteCallKerbUnpackKdcReplyBody)] struct {
+                KERBISO_ASN1_DATA* EncryptedData;
+                KERBISO_REMOTE_ENCRYPTION_KEY* Key;
+                KERBISO_REMOTE_ENCRYPTION_KEY* StrengthenKey;
+                unsigned int Pdu;
+                unsigned int KeyUsage;
+            } UnpackKdcReplyBody;
+
+            // Calculate the MAC for a KRB_TGS_REQ. In RFC 4120 it is referred to as a "Checksum" and thus the terminology is maintained.
+            [case(RemoteCallKerbComputeTgsChecksum)] struct {
+                KERBISO_ASN1_DATA* RequestBody;
+                KERBISO_REMOTE_ENCRYPTION_KEY* Key;
+                unsigned int ChecksumType;
+            } ComputeTgsChecksum;
+
+            // Encrypt the given authorization data which is to be included within the request body of a message to be sent to the KDC.
+            [case(RemoteCallKerbBuildEncryptedAuthData)] struct {
+                unsigned int KeyUsage;
+                KERBISO_REMOTE_ENCRYPTION_KEY* Key;
+                KERBISO_ASN1_DATA* PlainAuthData;
+            } BuildEncryptedAuthData;
+
+            // Pack up and encrypt a KRB_AP_REP message using the given session key.
+            [case(RemoteCallKerbPackApReply)] struct {
+                KERBISO_ASN1_DATA* Reply;
+                KERBISO_ASN1_DATA* ReplyBody;
+                KERBISO_REMOTE_ENCRYPTION_KEY* SessionKey;
+            } PackApReply;
+
+            // Create a MAC for S4U pre-authentication data to be include in a KRB_TGS_REQ when requesting an S4U service ticket for another principal.
+            [case(RemoteCallKerbHashS4UPreauth)] struct {
+                KERBISO_ASN1_DATA* S4UPreauth;
+                KERBISO_REMOTE_ENCRYPTION_KEY* Key;
+                unsigned int ChecksumType;
+            } HashS4UPreauth;
+
+            // Create a MAC for S4U pre-authentication data that is for certificate-based users. This pa-data is added to KRB_TGS_REQ when requesting an S4U service ticket.
+            [case(RemoteCallKerbSignS4UPreauthData)] struct {
+                KERBISO_REMOTE_ENCRYPTION_KEY* Key;
+                IUM_BOOL IsRequest;
+                KERBISO_ASN1_DATA* UserId;
+                unsigned int* ChecksumType;
+            } SignS4UPreauthData;
+
+            // Calculate a MAC from the given data and compare it to the given expected value. Used to detect mismatches which may indicate tampering with the PAC which is sent by the KDC to the client inside a KRB_KDC_REP.
+            [case(RemoteCallKerbVerifyChecksum)] struct {
+                KERBISO_REMOTE_ENCRYPTION_KEY* Key;
+                unsigned int ChecksumType;
+                unsigned int ExpectedChecksumSize;
+                [size_is(ExpectedChecksumSize)] const char* ExpectedChecksum;
+                unsigned int DataToCheckSize;
+                [size_is(DataToCheckSize)] const char* DataToCheck;
+            } VerifyChecksum;
+
+            // Build a Kerberos FAST (RFC 6113) ticket armor key by generating a subkey, then combining it with the given shared key.
+            [case(RemoteCallKerbBuildTicketArmorKey)] struct {
+                KERBISO_REMOTE_ENCRYPTION_KEY* SharedKey;
+            } BuildTicketArmorKey;
+
+            // Build a Keberos FAST (RFC 6113) explicit armor key by generating a subkey, then combining is with the given ticket session key.
+            [case(RemoteCallKerbBuildExplicitArmorKey)] struct {
+                KERBISO_REMOTE_ENCRYPTION_KEY* TicketSessionKey;
+            } BuildExplicitArmorKey;
+
+            // Verify the Kerberost FAST armor on a KRB_KDC_REP.
+            [case(RemoteCallKerbVerifyFastArmoredTgsReply)] struct {
+                KERBISO_ASN1_DATA* KdcRequest;
+                KERBISO_ASN1_DATA* KdcReply;
+                KERBISO_REMOTE_ENCRYPTION_KEY* ArmorKey;
+                KERBISO_REMOTE_ENCRYPTION_KEY* ReplyKey;
+            } VerifyFastArmoredTgsReply;
+
+            // Verify the encrypted challenge preauth data included in KRB_KDC_REP. For more info, see PA-ENCRYPTED-CHALLENGE in RFC 6113.
+            [case(RemoteCallKerbVerifyEncryptedChallengePaData)] struct {
+                KERBISO_REMOTE_ENCRYPTION_KEY* ArmorKey;
+                KERBISO_REMOTE_ENCRYPTION_KEY* UserKey;
+                KERBISO_PA_DATA* PaData;
+            } VerifyEncryptedChallengePaData;
+
+            // Calcuate the PA-FX-FAST armor based off of a given KRB_KDC_REQ, then include that armor in the preauth data of the request. (See RFC 6113)
+            [case(RemoteCallKerbBuildFastArmoredKdcRequest)] struct {
+                KEY_AGREEMENT_HANDLE KeyAgreementHandle;
+                KERBISO_ASN1_DATA* KdcRequest;
+                KERBISO_PA_DATA* PaTgsReqPaData;
+                KERBISO_FAST_ARMOR* FastArmor;
+                KERBISO_REMOTE_ENCRYPTION_KEY* ArmorKey;
+            } BuildFastArmoredKdcRequest;
+
+            // Decrypt a Kerberos FAST (RFC 6113) armored error message.
+            [case(RemoteCallKerbDecryptFastArmoredKerbError)] struct {
+                int RequestNonce;
+                KERBISO_ASN1_DATA* InputKerbError;
+                KERBISO_REMOTE_ENCRYPTION_KEY* ArmorKey;
+            } DecryptFastArmoredKerbError;
+
+            // Decrypt a Kerberos FAST (RFC 6113) armored KRB_AS_REP
+            [case(RemoteCallKerbDecryptFastArmoredAsReply)] struct {
+                KERBISO_ASN1_DATA* KdcRequest;
+                KERBISO_ASN1_DATA* KdcReply;
+                KERBISO_REMOTE_ENCRYPTION_KEY* ArmorKey;
+            } DecryptFastArmoredAsReply;
+
+            // Decrypt the supplemental credentials which are contained with the PAC sent back by the KDC in a KRB_KDC_REP.
+            [case(RemoteCallKerbDecryptPacCredentials)] struct {
+                KERBISO_REMOTE_ENCRYPTION_KEY* Key;
+                unsigned int Version;
+                unsigned int EncryptionType;
+                unsigned int DataSize;
+                [size_is(DataSize)] char* Data;
+            } DecryptPacCredentials;
+
+            // Create a new ECDH key agreement handle with the given ECC key bit length
+            [case(RemoteCallKerbCreateECDHKeyAgreement)] struct {
+                unsigned int KeyBitLen;
+            } CreateECDHKeyAgreement;
+
+            [case(RemoteCallKerbCreateDHKeyAgreement)] struct {
+                // This [case(RemoteCallKerb)] struct has no input parameters, but for 
+                // simplicity and consistency with the other parameters, let's define
+                // this as a [case(RemoteCallKerb)] struct with a single ignored value.
+                byte Ignored;
+            } CreateDHKeyAgreement;
+
+            // Destroy a key agreement handle which was previously constructed with either CreateECDHKeyAgreement or CreateDHKeyAgreement.
+            [case(RemoteCallKerbDestroyKeyAgreement)] struct {
+                KEY_AGREEMENT_HANDLE KeyAgreementHandle;
+            } DestroyKeyAgreement;
+
+            // Generate a nonce for use with the given key agreement. This nonce is part of the Diffie-Hellman agreement that is part of Kerberos PKINIT (RFC 4556)
+            [case(RemoteCallKerbKeyAgreementGenerateNonce)] struct {
+                KEY_AGREEMENT_HANDLE KeyAgreementHandle;
+            } KeyAgreementGenerateNonce;
+
+            // Finish a Kerberos PKINIT (RFC 4556) key agreement.
+            [case(RemoteCallKerbFinalizeKeyAgreement)] struct {
+                KEY_AGREEMENT_HANDLE* KeyAgreementHandle;
+                unsigned int KerbEType;
+                unsigned int RemoteNonceLen;
+                [size_is(RemoteNonceLen)] char* RemoteNonce;
+                unsigned int X509PublicKeyLen;
+                [size_is(X509PublicKeyLen)] char* X509PublicKey;
+            } FinalizeKeyAgreement;
+        };
+    } KerbCredIsoRemoteInput, *PKerbCredIsoRemoteInput;
+
+    typedef struct _KerbCredIsoRemoteOutput
+    {
+        RemoteGuardCallId CallId;
+        int Status;
+
+        [switch_type(RemoteGuardCallId), switch_is(CallId)] union
+        {
+            [case(RemoteCallKerbNegotiateVersion)] struct {
+                unsigned int VersionToUse;
+            } NegotiateVersion;
+
+            [case(RemoteCallKerbBuildAsReqAuthenticator)] struct {
+                int PreauthDataType;
+                IUM_OCTET_STRING PreauthData;
+            } BuildAsReqAuthenticator;
+
+            [case(RemoteCallKerbVerifyServiceTicket)] struct {
+                KERBISO_ASN1_DATA DecryptedTicket;
+                int KerbProtocolError;
+            } VerifyServiceTicket;
+
+            [case(RemoteCallKerbCreateApReqAuthenticator)] struct {
+                IUM_LARGE_INTEGER AuthenticatorTime;
+                KERBISO_ASN1_DATA Authenticator;
+                int KerbProtocolError;
+            } CreateApReqAuthenticator;
+
+            [case(RemoteCallKerbDecryptApReply)] struct {
+                KERBISO_ASN1_DATA ApReply;
+            } DecryptApReply;
+
+            [case(RemoteCallKerbUnpackKdcReplyBody)] struct {
+                int KerbProtocolError;
+                KERBISO_ASN1_DATA ReplyBody;
+            } UnpackKdcReplyBody;
+
+            [case(RemoteCallKerbComputeTgsChecksum)] struct {
+                KERBISO_ASN1_DATA Checksum;
+            } ComputeTgsChecksum;
+
+            [case(RemoteCallKerbBuildEncryptedAuthData)] struct {
+                KERBISO_ASN1_DATA EncryptedAuthData;
+            } BuildEncryptedAuthData;
+
+            [case(RemoteCallKerbPackApReply)] struct {
+                unsigned int PackedReplySize;
+                [size_is(PackedReplySize)] char* PackedReply;
+            } PackApReply;
+
+            [case(RemoteCallKerbHashS4UPreauth)] struct {
+                unsigned int* ChecksumSize;
+                [size_is(, *ChecksumSize)] char** ChecksumValue;
+            } HashS4UPreauth;
+
+            [case(RemoteCallKerbSignS4UPreauthData)] struct {
+                int* ChecksumType;
+                unsigned int* ChecksumSize;
+                [size_is(, *ChecksumSize)] char** ChecksumValue;
+            } SignS4UPreauthData;
+
+            [case(RemoteCallKerbVerifyChecksum)] struct {
+                IUM_BOOL IsValid;
+            } VerifyChecksum;
+
+            [case(RemoteCallKerbBuildTicketArmorKey)] struct {
+                KERBISO_REMOTE_ENCRYPTION_KEY* SubKey;
+                KERBISO_REMOTE_ENCRYPTION_KEY* ArmorKey;
+            } BuildTicketArmorKey;
+
+            [case(RemoteCallKerbBuildExplicitArmorKey)] struct {
+                KERBISO_REMOTE_ENCRYPTION_KEY* ArmorSubKey;
+                KERBISO_REMOTE_ENCRYPTION_KEY* ExplicitArmorKey;
+                KERBISO_REMOTE_ENCRYPTION_KEY* SubKey;
+                KERBISO_REMOTE_ENCRYPTION_KEY* ArmorKey;
+            } BuildExplicitArmorKey;
+
+            [case(RemoteCallKerbVerifyFastArmoredTgsReply)] struct {
+                KERBISO_REMOTE_ENCRYPTION_KEY* NewReplyKey;
+                KERBISO_ASN1_DATA* ModifiedKdcReply;
+                IUM_LARGE_INTEGER* KdcTime;
+            } VerifyFastArmoredTgsReply;
+
+            [case(RemoteCallKerbVerifyEncryptedChallengePaData)] struct {
+                byte* IsValid;
+            } VerifyEncryptedChallengePaData;
+
+            [case(RemoteCallKerbBuildFastArmoredKdcRequest)] struct {
+                KERBISO_PA_DATA* FastPaDataResult;
+            } BuildFastArmoredKdcRequest;
+
+            [case(RemoteCallKerbDecryptFastArmoredKerbError)] struct {
+                KERBISO_ASN1_DATA* OutputKerbError;
+                KERBISO_ASN1_DATA* FastResponse;
+            } DecryptFastArmoredKerbError;
+
+            [case(RemoteCallKerbDecryptFastArmoredAsReply)] struct {
+                KERBISO_REMOTE_ENCRYPTION_KEY* StrengthenKey;
+                KERBISO_ASN1_DATA* ModifiedKdcReply;
+                IUM_LARGE_INTEGER* KdcTime;
+            } DecryptFastArmoredAsReply;
+
+            [case(RemoteCallKerbDecryptPacCredentials)] struct {
+                SECPKG_SUPPLEMENTAL_CRED_ARRAY* Credentials;
+            } DecryptPacCredentials;
+
+            [case(RemoteCallKerbCreateECDHKeyAgreement)] struct {
+                KEY_AGREEMENT_HANDLE* KeyAgreementHandle;
+                int* KerbErr;
+                unsigned int* EncodedPubKeyLen;
+                [size_is(, *EncodedPubKeyLen)] char** EncodedPubKey;
+            } CreateECDHKeyAgreement;
+
+            [case(RemoteCallKerbCreateDHKeyAgreement)] struct {
+                IUM_OCTET_STRING* ModulusP;
+                IUM_OCTET_STRING* GeneratorG;
+                IUM_OCTET_STRING* FactorQ;
+                KEY_AGREEMENT_HANDLE* KeyAgreementHandle;
+                int* KerbErr;
+                unsigned int* LittleEndianPublicKeyLen;
+                [size_is(,*LittleEndianPublicKeyLen)] char** LittleEndianPublicKey;
+            } CreateDHKeyAgreement;
+
+            [case(RemoteCallKerbDestroyKeyAgreement)] struct {
+                // This [case(RemoteCallKerb)] struct has no output, but for 
+                // simplicity and consistency define as a 
+                // [case(RemoteCallKerb)] struct with a single ignored value.
+                byte Ignored;
+            } DestroyKeyAgreement;
+
+            [case(RemoteCallKerbKeyAgreementGenerateNonce)] struct {
+                unsigned int* NonceLen;
+                [size_is(,*NonceLen)] char** Nonce;
+            } KeyAgreementGenerateNonce;
+
+            [case(RemoteCallKerbFinalizeKeyAgreement)] struct {
+                KERBISO_REMOTE_ENCRYPTION_KEY* SharedKey;
+            } FinalizeKeyAgreement;
+        };
+    } KerbCredIsoRemoteOutput, *PKerbCredIsoRemoteOutput;
+}

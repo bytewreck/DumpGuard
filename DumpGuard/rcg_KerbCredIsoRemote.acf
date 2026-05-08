@@ -1,0 +1,6 @@
+
+interface KerbCredIsoRemote
+{
+	typedef [encode, decode, allocate(all_nodes)] PKerbCredIsoRemoteInput;
+	typedef [encode, decode, allocate(all_nodes)] PKerbCredIsoRemoteOutput;
+}

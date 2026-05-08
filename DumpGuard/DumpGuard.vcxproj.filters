@@ -1,0 +1,194 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="ASN.1">
+      <UniqueIdentifier>{d2932cfe-b049-41b7-9b16-7a5d5541ef4f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ASN.1\base">
+      <UniqueIdentifier>{d3b944d8-0f7b-4fbc-832d-7488c3a59fcd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ASN.1\gssapi">
+      <UniqueIdentifier>{1424bf51-7aca-48bc-a5b2-820e109e7977}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ASN.1\krb5">
+      <UniqueIdentifier>{798ed785-567f-498b-aa7b-63bc37258d1b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ASN.1\spnego">
+      <UniqueIdentifier>{28a99980-5ff1-45fb-9b9f-49f9a16f6075}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ASN.1\tsssp">
+      <UniqueIdentifier>{cd32aa4b-69f0-4f06-a5f5-714631b2581f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Remote Credential Guard">
+      <UniqueIdentifier>{905d4715-fd69-4348-9502-9b8f4d958aeb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Remote Credential Guard\base">
+      <UniqueIdentifier>{cd087a9e-7904-4cb8-8e48-bc1ed07a4d0c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Remote Credential Guard\base\midl">
+      <UniqueIdentifier>{4f6f169b-710c-49e9-b11e-c055afa8f0f8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Remote Credential Guard\base types">
+      <UniqueIdentifier>{8a46f834-5bbb-41ac-a806-e8557f8053b5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Remote Credential Guard\base types\midl">
+      <UniqueIdentifier>{1243fba7-64d1-4b35-8093-6b6bf391f7b5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Remote Credential Guard\ntlm">
+      <UniqueIdentifier>{cf7a923c-77ce-45c6-925e-ee6cef6f7b1a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Remote Credential Guard\ntlm\midl">
+      <UniqueIdentifier>{55fd653f-d776-4a58-96eb-89ef6aa7f6d5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Protocols">
+      <UniqueIdentifier>{ff4e7095-e336-4083-b050-28da58044ef3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Protocols\kerberos">
+      <UniqueIdentifier>{9a67e884-0ac5-4ebf-9623-34279047a38e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Protocols\spnego">
+      <UniqueIdentifier>{ea783807-f307-447a-a758-920ce6de9f07}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Protocols\tsssp">
+      <UniqueIdentifier>{9cddb052-643a-4722-b7f8-ae573f2b5c0c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Remote Credential Guard\kerberos">
+      <UniqueIdentifier>{4e96331c-bb65-4a6c-a14a-c0849cfe5047}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Remote Credential Guard\kerberos\midl">
+      <UniqueIdentifier>{8d5dd1a0-d5e4-4a32-87a5-433d60dde2d3}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="asn1_base.h">
+      <Filter>ASN.1\base</Filter>
+    </ClInclude>
+    <ClInclude Include="asn1_tsssp.h">
+      <Filter>ASN.1\tsssp</Filter>
+    </ClInclude>
+    <ClInclude Include="asn1_spnego.h">
+      <Filter>ASN.1\spnego</Filter>
+    </ClInclude>
+    <ClInclude Include="asn1_gssapi.h">
+      <Filter>ASN.1\gssapi</Filter>
+    </ClInclude>
+    <ClInclude Include="asn1_krb5.h">
+      <Filter>ASN.1\krb5</Filter>
+    </ClInclude>
+    <ClInclude Include="rcg_NtlmCredIsoRemote_h.h">
+      <Filter>Remote Credential Guard\ntlm</Filter>
+    </ClInclude>
+    <ClInclude Include="rcg_RemoteGuardCallIds.h">
+      <Filter>Remote Credential Guard\base</Filter>
+    </ClInclude>
+    <ClInclude Include="rcg_BaseTypes.h">
+      <Filter>Remote Credential Guard\base types</Filter>
+    </ClInclude>
+    <ClInclude Include="spnego_server.h">
+      <Filter>Protocols\spnego</Filter>
+    </ClInclude>
+    <ClInclude Include="kerb_base.h">
+      <Filter>Protocols\kerberos</Filter>
+    </ClInclude>
+    <ClInclude Include="kerb_crypto.h">
+      <Filter>Protocols\kerberos</Filter>
+    </ClInclude>
+    <ClInclude Include="kerb_network.h">
+      <Filter>Protocols\kerberos</Filter>
+    </ClInclude>
+    <ClInclude Include="kerb_server.h">
+      <Filter>Protocols\kerberos</Filter>
+    </ClInclude>
+    <ClInclude Include="tsssp_server.h">
+      <Filter>Protocols\tsssp</Filter>
+    </ClInclude>
+    <ClInclude Include="tsssp_client.h">
+      <Filter>Protocols\tsssp</Filter>
+    </ClInclude>
+    <ClInclude Include="tsssp_rdpear.h">
+      <Filter>Protocols\tsssp</Filter>
+    </ClInclude>
+    <ClInclude Include="rcg_KerbCredIsoRemote_h.h">
+      <Filter>Remote Credential Guard\kerberos</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Midl Include="rcg_RemoteGuardCallIds.idl">
+      <Filter>Remote Credential Guard\base\midl</Filter>
+    </Midl>
+    <Midl Include="rcg_BaseTypes.idl">
+      <Filter>Remote Credential Guard\base types\midl</Filter>
+    </Midl>
+    <Midl Include="rcg_NtlmCredIsoRemote.idl">
+      <Filter>Remote Credential Guard\ntlm\midl</Filter>
+    </Midl>
+    <Midl Include="rcg_KerbCredIsoRemote.idl">
+      <Filter>Remote Credential Guard\kerberos\midl</Filter>
+    </Midl>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="asn1_base.c">
+      <Filter>ASN.1\base</Filter>
+    </ClCompile>
+    <ClCompile Include="asn1_tsssp.c">
+      <Filter>ASN.1\tsssp</Filter>
+    </ClCompile>
+    <ClCompile Include="asn1_spnego.c">
+      <Filter>ASN.1\spnego</Filter>
+    </ClCompile>
+    <ClCompile Include="asn1_gssapi.c">
+      <Filter>ASN.1\gssapi</Filter>
+    </ClCompile>
+    <ClCompile Include="asn1_krb5.c">
+      <Filter>ASN.1\krb5</Filter>
+    </ClCompile>
+    <ClCompile Include="rcg_RemoteGuardCallIds_i.c">
+      <Filter>Remote Credential Guard\base</Filter>
+    </ClCompile>
+    <ClCompile Include="rcg_NtlmCredIsoRemote_c.c">
+      <Filter>Remote Credential Guard\ntlm</Filter>
+    </ClCompile>
+    <ClCompile Include="rcg_NtlmCredIsoRemote_s.c">
+      <Filter>Remote Credential Guard\ntlm</Filter>
+    </ClCompile>
+    <ClCompile Include="main.c" />
+    <ClCompile Include="spnego_server.c">
+      <Filter>Protocols\spnego</Filter>
+    </ClCompile>
+    <ClCompile Include="kerb_base.c">
+      <Filter>Protocols\kerberos</Filter>
+    </ClCompile>
+    <ClCompile Include="kerb_crypto.c">
+      <Filter>Protocols\kerberos</Filter>
+    </ClCompile>
+    <ClCompile Include="kerb_network.c">
+      <Filter>Protocols\kerberos</Filter>
+    </ClCompile>
+    <ClCompile Include="kerb_server.c">
+      <Filter>Protocols\kerberos</Filter>
+    </ClCompile>
+    <ClCompile Include="tsssp_server.c">
+      <Filter>Protocols\tsssp</Filter>
+    </ClCompile>
+    <ClCompile Include="tsssp_client.c">
+      <Filter>Protocols\tsssp</Filter>
+    </ClCompile>
+    <ClCompile Include="tsssp_rdpear.c">
+      <Filter>Protocols\tsssp</Filter>
+    </ClCompile>
+    <ClCompile Include="rcg_KerbCredIsoRemote_c.c">
+      <Filter>Remote Credential Guard\kerberos</Filter>
+    </ClCompile>
+    <ClCompile Include="rcg_KerbCredIsoRemote_s.c">
+      <Filter>Remote Credential Guard\kerberos</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="rcg_NtlmCredIsoRemote.acf">
+      <Filter>Remote Credential Guard\ntlm\midl</Filter>
+    </None>
+    <None Include="rcg_KerbCredIsoRemote.acf">
+      <Filter>Remote Credential Guard\kerberos\midl</Filter>
+    </None>
+  </ItemGroup>
+</Project>
