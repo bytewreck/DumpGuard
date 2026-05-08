@@ -86,7 +86,7 @@ To dump credential material for all currently accessible users from a privileged
 
 This works regardless of the state of Credential Guard, but requires credentials for an SPN-enabled account.
 
-Privilege requirement: **SYSTEM** (or Administrator).
+Privilege requirement: **SYSTEM** or **Administrator** (requires **SeImpersonatePrivilege**).
 
 NTLMv1:
 ```text
@@ -113,7 +113,7 @@ This works only under the following conditions:
 - Credential Guard is disabled on the local system.
 - Remote users are authenticated to the local system from a remote host over Remote Credential Guard.
 
-Privilege requirement: **SYSTEM**.
+Privilege requirement: **SYSTEM** (requires **SeTcbPrivilege**).
 
 ```text
 DumpGuard.exe /command:msv10
