@@ -50,9 +50,9 @@ The following table summarizes the currently implemented techniques.
 
 | Technique | Command | Target | Requires<br>SYSTEM | Requires<br>SPN Account | Can Dump<br>Credential Guard |
 | -------- | ------- | :----: | :----------------: | :---------------------: | :--------------------------: |
-| Extract NTLMv1 via Remote Credential Guard | `ntlmv1` | `self` / `all` | `self`: no<br>`all`: yes | ✅ | ✅ |
-| Extract NTLMv2 via Remote Credential Guard | `ntlmv2` | `self` / `all` | `self`: no<br>`all`: yes | ✅ | ✅ |
-| Extract Kerberos service tickets via Remote Credential Guard | `kerbtgs` | `self` / `all` | `self`: no<br>`all`: yes | ✅ | ✅ |
+| Extract NTLMv1 via Remote Credential Guard | `ntlmv1` | `self` / `all` | `self`: :x:<br>`all`: ✅ | ✅ | ✅ |
+| Extract NTLMv2 via Remote Credential Guard | `ntlmv2` | `self` / `all` | `self`: :x:<br>`all`: ✅ | ✅ | ✅ |
+| Extract Kerberos service tickets via Remote Credential Guard | `kerbtgs` | `self` / `all` | `self`: :x:<br>`all`: ✅ | ✅ | ✅ |
 | Extract NTLM responses via Microsoft v1 authentication package | `msv10` | `all` | ✅ | :x: | :x: |
 
 ## Dumping Your Own Session via Remote Credential Guard
