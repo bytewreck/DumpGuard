@@ -19,6 +19,15 @@ You may download prebuilt copies from the release section of this repository.
 
 ## Usage Overview
 
+The following table summarizes the currently implemented techniques.
+
+| Technique | Command | Requires SYSTEM | Requires<br>SPN Account | Can Dump<br>Credential Guard |
+| -------- | ------- | :----------------: | :---------------------: | :--------------------------: |
+| Extract NTLMv1 via Remote Credential Guard | `ntlmv1` | `self`: :x:<br>`all`: ✅ | ✅ | ✅ |
+| Extract NTLMv2 via Remote Credential Guard | `ntlmv2` | `self`: :x:<br>`all`: ✅ | ✅ | ✅ |
+| Extract Kerberos TGS via Remote Credential Guard | `kerbtgs` | `self`: :x:<br>`all`: ✅ | ✅ | ✅ |
+| Extract NTLMv1 via Microsoft v1 authentication package | `msv10` | ✅ | :x: | :x: |
+
 DumpGuard uses a `command` plus `target` model.
 
 - `command` selects the extraction technique.
@@ -45,15 +54,6 @@ Kerberos TGS parameters:
 - `/tgsspn:<SPN>`
 
 If `/spn` is omitted for a computer account, DumpGuard defaults to `HOST/<computername>`.
-
-The following table summarizes the currently implemented techniques.
-
-| Technique | Command | Requires SYSTEM | Requires<br>SPN Account | Can Dump<br>Credential Guard |
-| -------- | ------- | :----------------: | :---------------------: | :--------------------------: |
-| Extract NTLMv1 via Remote Credential Guard | `ntlmv1` | `self`: :x:<br>`all`: ✅ | ✅ | ✅ |
-| Extract NTLMv2 via Remote Credential Guard | `ntlmv2` | `self`: :x:<br>`all`: ✅ | ✅ | ✅ |
-| Extract Kerberos TGS via Remote Credential Guard | `kerbtgs` | `self`: :x:<br>`all`: ✅ | ✅ | ✅ |
-| Extract NTLMv1 via Microsoft v1 authentication package | `msv10` | ✅ | :x: | :x: |
 
 ## Dumping Your Own Session via Remote Credential Guard
 
