@@ -49,7 +49,7 @@ If `/spn` is omitted for a computer account, DumpGuard defaults to `HOST/<comput
 The following table summarizes the currently implemented techniques.
 
 | Technique | Command | Requires<br>SYSTEM | Requires<br>SPN Account | Can Dump<br>Credential Guard |
-| -------- | ------- | :----: | :----------------: | :---------------------: | :--------------------------: |
+| -------- | ------- | :----------------: | :---------------------: | :--------------------------: |
 | Extract NTLMv1 via Remote Credential Guard | `ntlmv1` | `self`: :x:<br>`all`: ✅ | ✅ | ✅ |
 | Extract NTLMv2 via Remote Credential Guard | `ntlmv2` | `self`: :x:<br>`all`: ✅ | ✅ | ✅ |
 | Extract Kerberos service tickets via Remote Credential Guard | `kerbtgs` | `self`: :x:<br>`all`: ✅ | ✅ | ✅ |
