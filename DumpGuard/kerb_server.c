@@ -144,7 +144,7 @@ BOOL kerb_make_signature_old(KERB_CONTEXT* context, PVOID pvData, ULONG cbData, 
 
 	if (context->acceptor_subkey_type != kerb_etype_aes128 && context->acceptor_subkey_type != kerb_etype_aes256)
 	{
-		printf("Attempted to make kerberos signature with unspported key type: '%d'\n", context->acceptor_subkey_type);
+		printf("[-] Attempted to make kerberos signature with unspported key type: '%d'\n", context->acceptor_subkey_type);
 		return FALSE;
 	}
 	else if (context->acceptor_subkey_type == kerb_etype_aes128)
@@ -209,7 +209,7 @@ BOOL kerb_seal_message_old(KERB_CONTEXT* context, PVOID pvData, ULONG cbData, PV
 
 	if (context->acceptor_subkey_type != kerb_etype_aes128 && context->acceptor_subkey_type != kerb_etype_aes256)
 	{
-		printf("Attempted to seal kerberos message with unsupported key type: '%d'\n", context->acceptor_subkey_type);
+		printf("[-] Attempted to seal kerberos message with unsupported key type: '%d'\n", context->acceptor_subkey_type);
 		return FALSE;
 	}
 	else if (context->acceptor_subkey_type == kerb_etype_aes128)
@@ -288,7 +288,7 @@ BOOL kerb_unseal_message_old(KERB_CONTEXT* context, PVOID pvData, ULONG cbData, 
 
 	if (context->acceptor_subkey_type != kerb_etype_aes128 && context->acceptor_subkey_type != kerb_etype_aes256)
 	{
-		printf("Attempted to unseal kerberos message with unsupported key type: '%d'\n", context->acceptor_subkey_type);
+		printf("[-] Attempted to unseal kerberos message with unsupported key type: '%d'\n", context->acceptor_subkey_type);
 		return FALSE;
 	}
 	else if (context->acceptor_subkey_type == kerb_etype_aes128)
@@ -316,7 +316,7 @@ BOOL kerb_unseal_message_old(KERB_CONTEXT* context, PVOID pvData, ULONG cbData, 
 
 		if (right_rotation_count > extra_count)
 		{
-			puts("Failed to unseal kerberos message due to data rotation which is currently not implemented");
+			puts("[-] Failed to unseal kerberos message due to data rotation which is currently not implemented");
 			return FALSE;
 		}
 
@@ -525,9 +525,9 @@ BOOL kerb_handle_tgt_request(KERB_CONTEXT* context, LPCVOID pvTgtRequest, ULONG 
 	if (asn1_decode_kerb(pvTgtRequest, cbTgtRequest, KERB_TGT_REQUEST_PDU, &tgt_request))
 	{
 		if (tgt_request->version != 5)
-			printf("Kerberos TGT-REQ must have version 5\n");
+			printf("[-] Kerberos TGT-REQ must target version 5\n");
 		else if (tgt_request->message_type != kerb_mt_KrbTgtReqU2U)
-			printf("Kerberos TGT-REQ handling for message type '%d' is currently not supported\n", tgt_request->message_type);
+			printf("[-] Kerberos TGT-REQ handling for message type '%d' is currently not supported\n", tgt_request->message_type);
 		else
 		{
 			ULONG cbAsRequest = 0;
@@ -544,7 +544,7 @@ BOOL kerb_handle_tgt_request(KERB_CONTEXT* context, LPCVOID pvTgtRequest, ULONG 
 
 				if (!as_req_ok && pvAsReply != NULL)
 				{
-					printf("Trying to rebuild longterm keys with KDC-provided salt: %s\n", (const char*)pvAsReply);
+					printf("[*] Trying to rebuild longterm keys with KDC-provided salt: %s\n", (const char*)pvAsReply);
 					kerb_build_longterm_keys(context, (const char*)pvAsReply);
 
 					free(pvAsReply);
@@ -678,9 +678,9 @@ BOOL kerb_handle_ap_request(KERB_CONTEXT* context, LPCVOID pvRequest, ULONG cbRe
 	if (asn1_decode_kerb(pvRequest, cbRequest, KERB_AP_REQUEST_PDU, &ap_request))
 	{
 		if (ap_request->version != 5)
-			printf("Kerberos AP-REQ must have version 5\n");
+			printf("[-] Kerberos AP-REQ must target version 5\n");
 		else if (ap_request->message_type != kerb_mt_KrbApReq)
-			printf("Kerberos AP-REQ handling for message type '%d' is currently not supported\n", ap_request->message_type);
+			printf("[-] Kerberos AP-REQ handling for message type '%d' is currently not supported\n", ap_request->message_type);
 		else
 		{
 			ULONG ap_options = kerb_get_bitstring32(ap_request->ap_options.value, ap_request->ap_options.length);
@@ -871,7 +871,7 @@ BOOL kerb_handle_token(KERB_CONTEXT* context, KERB_GSS_TOKEN_ID token_id, LPCVOI
 		return kerb_handle_ap_request(context, pvToken, cbToken, fGssApi, ppvResponse, pcbResponse);
 
 	default:
-		printf("Kerberos handling for token id '%d' is not currently supported\n", token_id);
+		printf("[-] Kerberos handling for token id '%d' is not currently supported\n", token_id);
 		return FALSE;
 	}
 }

@@ -21,7 +21,7 @@ typedef struct _TSSSP_CLIENT_CONTEXT
 void tsssp_client_init_context(TSSSP_CLIENT_CONTEXT* context);
 void tsssp_client_free_context(TSSSP_CLIENT_CONTEXT* context);
 
-BOOL tsssp_client_acquire_credentials(TSSSP_CLIENT_CONTEXT* context);
-BOOL tsssp_client_initialize_security_context(TSSSP_CLIENT_CONTEXT* context, LPCSTR lpTarget, SecBufferDesc* pInput, SecBufferDesc* pOutput);
+NTSTATUS tsssp_client_acquire_credentials(TSSSP_CLIENT_CONTEXT* context);
+NTSTATUS tsssp_client_initialize_security_context(TSSSP_CLIENT_CONTEXT* context, LPCSTR lpTarget, SecBufferDesc* pInput, SecBufferDesc* pOutput);
 
 #endif

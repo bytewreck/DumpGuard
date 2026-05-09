@@ -141,7 +141,7 @@ BOOL spnego_accept_token(SPNEGO_CONTEXT* context, LPCVOID pvRequest, ULONG cbReq
 	BOOL result = FALSE;
 
 	if (cbRequest >= 7 && strncmp(pvRequest, "NTLMSSP", 7) == 0)
-		puts("The client attempted to negotiate NTLM");
+		puts("[-] The client attempted to negotiate NTLM (target SPN is probably malformed)");
 	else if (cbRequest > 0 && ((BYTE*)pvRequest)[0] == 0x60)
 	{
 		InitialNegToken* init_token = NULL;
@@ -151,9 +151,9 @@ BOOL spnego_accept_token(SPNEGO_CONTEXT* context, LPCVOID pvRequest, ULONG cbReq
 			ULONG krb5_gss_api_mech[] = { 1, 2, 840, 113554, 1, 2, 2 };
 
 			if ((init_token->negToken.u.negTokenInit.bit_mask & NegTokenInit_mechToken_present) == 0)
-				puts("NegTokenInit did not contain MechToken");
+				puts("[-] NegTokenInit does not contain a token for the underlying protocol");
 			else if (!spnego_mech_list_contains(init_token->negToken.u.negTokenInit.mechTypes, krb5_gss_api_mech, _countof(krb5_gss_api_mech)))
-				puts("MechTypeList does not contain Kerberoes 5 GSS-API Mechanism (1.2.840.113554.1.2.2)");
+				puts("[-] MechTypeList does not contain Kerberoes 5 GSS-API Mechanism (1.2.840.113554.1.2.2)");
 			else
 			{
 				ULONG cbSavedMechTypeList = 0;
@@ -187,7 +187,7 @@ BOOL spnego_accept_token(SPNEGO_CONTEXT* context, LPCVOID pvRequest, ULONG cbReq
 		if (asn1_decode_spnego(pvRequest, cbRequest, NegotiationToken_PDU, &neg_token))
 		{
 			if ((neg_token->u.negTokenTarg.bit_mask & negResult_present) == 0)
-				puts("NegToken does not contain a result");
+				puts("[-] NegToken does not contain a result");
 			else if (neg_token->u.negTokenTarg.negResult == accept_completed)
 				context->kerb.state = kerb_st_Authenticated;
 			else if (neg_token->u.negTokenTarg.negResult == accept_incomplete)
@@ -205,7 +205,7 @@ BOOL spnego_accept_token(SPNEGO_CONTEXT* context, LPCVOID pvRequest, ULONG cbReq
 			}
 			else
 			{
-				printf("NegToken contains unsupported result: %d\n", neg_token->u.negTokenTarg.negResult);
+				printf("[-] NegToken contains unsupported result: %d\n", neg_token->u.negTokenTarg.negResult);
 			}
 
 			asn1_free_spnego(neg_token, NegotiationToken_PDU);

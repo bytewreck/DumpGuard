@@ -273,7 +273,7 @@ BOOL kerb_send_kdc_request(LPCSTR domain, LPCBYTE pbRequest, ULONG cbRequest, PV
 
 			if (asn1_decode_kerb(pvResponse, cbResponse, KERB_ERROR_PDU, &kerb_error))
 			{
-				printf("The KDC returned error code: %s (%s)\n", kerb_err_name(kerb_error->error_code), kerb_err_desc(kerb_error->error_code));
+				printf("[-] The KDC returned error code 0x%08x (%s): %s\n", kerb_error->error_code, kerb_err_name(kerb_error->error_code), kerb_err_desc(kerb_error->error_code));
 
 				if (kerb_error->error_code == KDC_ERR_PREAUTH_FAILED && (kerb_error->bit_mask & error_data_present) != 0)
 				{

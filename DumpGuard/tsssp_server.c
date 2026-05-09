@@ -125,211 +125,219 @@ BOOL tsssp_server_accept_security_context(TSSSP_SERVER_CONTEXT* context, LPCVOID
 {
 	BOOL result = FALSE;
 
-	TSRequest ts_response;
-	memset(&ts_response, 0, sizeof(ts_response));
-
 	TSRequest* ts_request = NULL;
 
 	if (asn1_decode_tsssp(pvRequest, cbRequest, ASN1_PDU_TSREQUEST, &ts_request))
 	{
-		if ((ts_request->Flags & TSREQUEST_HAS_NEGOTOKENS) != 0)
-		{
-			NegoData* current = ts_request->NegoTokens;
-
-			while (current != NULL)
-			{
-				ULONG cbNegoResponse = 0;
-				PVOID pvNegoResponse = NULL;
-
-				if (spnego_accept_token(&context->spnego, current->NegoToken.value, current->NegoToken.length, &pvNegoResponse, &cbNegoResponse))
-				{
-					if (pvNegoResponse != NULL && cbNegoResponse != 0)
-					{
-						NegoData* response = malloc(sizeof(NegoData));
-
-						if (response == NULL)
-							free(pvNegoResponse);
-						else
-						{
-							response->Next = ts_response.NegoTokens;
-							response->NegoToken.value = pvNegoResponse;
-							response->NegoToken.length = cbNegoResponse;
-
-							ts_response.Flags |= TSREQUEST_HAS_NEGOTOKENS;
-							ts_response.NegoTokens = response;
-						}
-					}
-				}
-				else if (context->spnego.kerb.state != kerb_st_Authenticated)
-				{
-					puts("Failed to generate SPNEGO token");
-				}
-
-				current = current->Next;
-			}
-		}
-
-		if ((ts_request->Flags & TSREQUEST_HAS_PUBKEYAUTH) != 0)
-		{
-			ULONG cbDecrypted = 0;
-			PVOID pvDecrypted = NULL;
-
-			if (tsssp_server_decrypt(context, ts_request->PubKeyAuth.value, ts_request->PubKeyAuth.length, &pvDecrypted, &cbDecrypted))
-			{
-				ULONG cbPubKey = 0;
-				PVOID pvPubKey = NULL;
-
-				if (tsssp_get_cert_public_key(pvCert, cbCert, &pvPubKey, &cbPubKey))
-				{
-					ULONG cbData = 0;
-					PVOID pvData = NULL;
-
-					if (ts_request->Version <= 4)
-					{
-						if (cbDecrypted != cbPubKey || memcmp(pvDecrypted, pvPubKey, min(cbDecrypted, cbPubKey)) != 0)
-							printf("The client pubkey auth contained an incorrect public key");
-						else
-						{
-							ULONG cbAuth = cbPubKey;
-							PVOID pvAuth = malloc(cbAuth);
-
-							if (pvAuth != NULL)
-							{
-								memcpy(pvAuth, pvPubKey, cbAuth);
-
-								if (ts_request->Version <= 1)
-									*(DWORD*)pvAuth += 1;
-								else
-									*(BYTE*)pvAuth += 1;
-
-								pvData = pvAuth;
-								cbData = cbAuth;
-							}
-						}
-					}
-					else if ((ts_request->Flags & TSREQUEST_HAS_CLIENTNONCE) != 0 && ts_request->ClientNonce.value != NULL && ts_request->ClientNonce.length != 0)
-					{
-						ULONG cbHash = 32;
-						PVOID pvHash = malloc(cbHash);
-
-						if (pvHash != NULL)
-						{
-							if (!tsssp_calculate_binding_hash(TRUE, ts_request->ClientNonce.value, ts_request->ClientNonce.length, pvPubKey, cbPubKey, pvHash))
-								puts("The client pubkey auth could not be verified");
-							else if (cbDecrypted != cbHash || memcmp(pvDecrypted, pvHash, min(cbDecrypted, cbHash)) != 0)
-								puts("The client pubkey auth contained a hash for an incorrect public key");
-							else if (tsssp_calculate_binding_hash(FALSE, ts_request->ClientNonce.value, ts_request->ClientNonce.length, pvPubKey, cbPubKey, pvHash))
-							{
-								pvData = pvHash;
-								cbData = cbHash;
-							}
-						}
-					}
-
-					if (pvData != NULL && cbData != 0)
-					{
-						ULONG cbEncrypted = 0;
-						PVOID pvEncrypted = NULL;
-
-						if (tsssp_server_encrypt(context, pvData, cbData, &pvEncrypted, &cbEncrypted))
-						{
-							ts_response.Flags |= TSREQUEST_HAS_PUBKEYAUTH;
-							ts_response.PubKeyAuth.value = pvEncrypted;
-							ts_response.PubKeyAuth.length = cbEncrypted;
-						}
-
-						free(pvData);
-					}
-
-					free(pvPubKey);
-				}
-
-				free(pvDecrypted);
-			}
-		}
-
-		if ((ts_request->Flags & TSREQUEST_HAS_AUTHINFO) != 0)
-		{
-			ULONG cbDecrypted = 0;
-			PVOID pvDecrypted = NULL;
-
-			if (tsssp_server_decrypt(context, ts_request->AuthInfo.value, ts_request->AuthInfo.length, &pvDecrypted, &cbDecrypted))
-			{
-				TSCredentials* ts_creds = NULL;
-
-				if (asn1_decode_tsssp(pvDecrypted, cbDecrypted, ASN1_PDU_TSCREDENTIALS, &ts_creds))
-				{
-					TSRemoteGuardCreds* ts_rg_creds = NULL;
-
-					if (ts_creds->CredType != TsCredTypeRemoteGuard)
-						printf("Obtained unusable credential type: %d\n", ts_creds->CredType);
-					else if (asn1_decode_tsssp(ts_creds->Credentials.value, ts_creds->Credentials.length, ASN1_PDU_TSREMOTEGUARDCREDS, &ts_rg_creds))
-					{
-						context->cbPrimaryCreds = ts_rg_creds->LogonCred.CredBuffer.length;
-						context->pvPrimaryCreds = malloc(context->cbPrimaryCreds);
-
-						if (context->pvPrimaryCreds != NULL)
-							memcpy(context->pvPrimaryCreds, ts_rg_creds->LogonCred.CredBuffer.value, context->cbPrimaryCreds);
-
-						if ((ts_rg_creds->Flags & TSREMOTEGUARDCREDS_HAS_SUPPLEMENTAL_CREDS) != 0)
-						{
-							TSRemoteGuardCreds_supplementalCreds* current = ts_rg_creds->SupplementalCreds;
-
-							while (current != NULL)
-							{
-								if (current->Value.PackageName.length >= 8 && wcsncmp((const wchar_t*)current->Value.PackageName.value, L"NTLM", 4) == 0)
-								{
-									context->cbSupplementalCreds = current->Value.CredBuffer.length;
-									context->pvSupplementalCreds = malloc(context->cbSupplementalCreds);
-
-									if (context->pvSupplementalCreds != NULL)
-										memcpy(context->pvSupplementalCreds, current->Value.CredBuffer.value, context->cbSupplementalCreds);
-
-									break;
-								}
-
-								current = current->Next;
-							}
-						}
-						
-						asn1_free_tsssp(ts_rg_creds, ASN1_PDU_TSREMOTEGUARDCREDS);
-					}
-
-					asn1_free_tsssp(ts_creds, ASN1_PDU_TSCREDENTIALS);
-				}
-
-				free(pvDecrypted);
-			}
-		}
-
-		if (ts_response.Flags == 0)
-			context->authenticated = result = TRUE;
+		if ((ts_request->Flags & TSREQUEST_HAS_ERRORCODE) != 0)
+			printf("[-] TsRequest contained error code: 0x%08x\n", ts_request->ErrorCode);
 		else
 		{
+			TSRequest ts_response;
+			memset(&ts_response, 0, sizeof(ts_response));
+
 			ts_response.Version = 6;
 
-			ULONG cbResponse = 0;
-			PVOID pvResponse = NULL;
-
-			if (asn1_encode_tsssp(&ts_response, ASN1_PDU_TSREQUEST, &pvResponse, &cbResponse))
+			if ((ts_request->Flags & TSREQUEST_HAS_NEGOTOKENS) != 0)
 			{
-				*ppvResponse = pvResponse;
-				*pcbResponse = cbResponse;
+				NegoData* current = ts_request->NegoTokens;
+
+				while (current != NULL)
+				{
+					ULONG cbNegoResponse = 0;
+					PVOID pvNegoResponse = NULL;
+
+					if (spnego_accept_token(&context->spnego, current->NegoToken.value, current->NegoToken.length, &pvNegoResponse, &cbNegoResponse))
+					{
+						if (pvNegoResponse != NULL && cbNegoResponse != 0)
+						{
+							NegoData* response = malloc(sizeof(NegoData));
+
+							if (response == NULL)
+								free(pvNegoResponse);
+							else
+							{
+								response->Next = ts_response.NegoTokens;
+								response->NegoToken.value = pvNegoResponse;
+								response->NegoToken.length = cbNegoResponse;
+
+								ts_response.Flags |= TSREQUEST_HAS_NEGOTOKENS;
+								ts_response.NegoTokens = response;
+							}
+						}
+					}
+
+					current = current->Next;
+				}
 			}
 
-			if (ts_response.PubKeyAuth.value != NULL)
-				free(ts_response.PubKeyAuth.value);
-
-			NegoData* current = ts_response.NegoTokens;
-
-			while (current != NULL)
+			if ((ts_request->Flags & TSREQUEST_HAS_PUBKEYAUTH) != 0)
 			{
-				NegoData* next = current->Next;
+				ULONG cbDecrypted = 0;
+				PVOID pvDecrypted = NULL;
 
-				free(current->NegoToken.value);
-				free(current);
+				if (tsssp_server_decrypt(context, ts_request->PubKeyAuth.value, ts_request->PubKeyAuth.length, &pvDecrypted, &cbDecrypted))
+				{
+					ULONG cbPubKey = 0;
+					PVOID pvPubKey = NULL;
 
-				current = next;
+					if (tsssp_get_cert_public_key(pvCert, cbCert, &pvPubKey, &cbPubKey))
+					{
+						ULONG cbData = 0;
+						PVOID pvData = NULL;
+
+						if (ts_request->Version <= 4)
+						{
+							if (cbDecrypted != cbPubKey || memcmp(pvDecrypted, pvPubKey, min(cbDecrypted, cbPubKey)) != 0)
+								printf("[-] The client pubkey auth contained an incorrect public key");
+							else
+							{
+								ULONG cbAuth = cbPubKey;
+								PVOID pvAuth = malloc(cbAuth);
+
+								if (pvAuth != NULL)
+								{
+									memcpy(pvAuth, pvPubKey, cbAuth);
+
+									if (ts_request->Version <= 1)
+										*(DWORD*)pvAuth += 1;
+									else
+										*(BYTE*)pvAuth += 1;
+
+									pvData = pvAuth;
+									cbData = cbAuth;
+								}
+							}
+						}
+						else if ((ts_request->Flags & TSREQUEST_HAS_CLIENTNONCE) != 0 && ts_request->ClientNonce.value != NULL && ts_request->ClientNonce.length != 0)
+						{
+							ULONG cbHash = 32;
+							PVOID pvHash = malloc(cbHash);
+
+							if (pvHash != NULL)
+							{
+								if (!tsssp_calculate_binding_hash(TRUE, ts_request->ClientNonce.value, ts_request->ClientNonce.length, pvPubKey, cbPubKey, pvHash))
+									puts("[-] The client pubkey auth could not be generated");
+								else if (cbDecrypted != cbHash || memcmp(pvDecrypted, pvHash, min(cbDecrypted, cbHash)) != 0)
+									puts("[-] The client pubkey auth contained a hash for an incorrect public key");
+								else if (!tsssp_calculate_binding_hash(FALSE, ts_request->ClientNonce.value, ts_request->ClientNonce.length, pvPubKey, cbPubKey, pvHash))
+									puts("[-] The server pubkey auth could not be generated");
+								else
+								{
+									pvData = pvHash;
+									cbData = cbHash;
+								}
+							}
+						}
+
+						if (pvData != NULL && cbData != 0)
+						{
+							ULONG cbEncrypted = 0;
+							PVOID pvEncrypted = NULL;
+
+							if (tsssp_server_encrypt(context, pvData, cbData, &pvEncrypted, &cbEncrypted))
+							{
+								ts_response.Flags |= TSREQUEST_HAS_PUBKEYAUTH;
+								ts_response.PubKeyAuth.value = pvEncrypted;
+								ts_response.PubKeyAuth.length = cbEncrypted;
+							}
+
+							free(pvData);
+						}
+
+						free(pvPubKey);
+					}
+
+					free(pvDecrypted);
+				}
+			}
+
+			if ((ts_request->Flags & TSREQUEST_HAS_AUTHINFO) != 0)
+			{
+				ULONG cbDecrypted = 0;
+				PVOID pvDecrypted = NULL;
+
+				if (tsssp_server_decrypt(context, ts_request->AuthInfo.value, ts_request->AuthInfo.length, &pvDecrypted, &cbDecrypted))
+				{
+					TSCredentials* ts_creds = NULL;
+
+					if (asn1_decode_tsssp(pvDecrypted, cbDecrypted, ASN1_PDU_TSCREDENTIALS, &ts_creds))
+					{
+						if (ts_creds->CredType != TsCredTypeRemoteGuard)
+							printf("[-] Obtained unusable redirected credential type: %d\n", ts_creds->CredType);
+						else
+						{
+							TSRemoteGuardCreds* ts_rg_creds = NULL;
+
+							if (asn1_decode_tsssp(ts_creds->Credentials.value, ts_creds->Credentials.length, ASN1_PDU_TSREMOTEGUARDCREDS, &ts_rg_creds))
+							{
+								context->cbPrimaryCreds = ts_rg_creds->LogonCred.CredBuffer.length;
+								context->pvPrimaryCreds = malloc(context->cbPrimaryCreds);
+
+								if (context->pvPrimaryCreds != NULL)
+									memcpy(context->pvPrimaryCreds, ts_rg_creds->LogonCred.CredBuffer.value, context->cbPrimaryCreds);
+
+								if ((ts_rg_creds->Flags & TSREMOTEGUARDCREDS_HAS_SUPPLEMENTAL_CREDS) != 0)
+								{
+									TSRemoteGuardCreds_supplementalCreds* current = ts_rg_creds->SupplementalCreds;
+
+									while (current != NULL)
+									{
+										if (current->Value.PackageName.length >= 8 && wcsncmp((const wchar_t*)current->Value.PackageName.value, L"NTLM", 4) == 0)
+										{
+											context->cbSupplementalCreds = current->Value.CredBuffer.length;
+											context->pvSupplementalCreds = malloc(context->cbSupplementalCreds);
+
+											if (context->pvSupplementalCreds != NULL)
+												memcpy(context->pvSupplementalCreds, current->Value.CredBuffer.value, context->cbSupplementalCreds);
+
+											break;
+										}
+
+										current = current->Next;
+									}
+								}
+
+								context->authenticated = result = TRUE;
+
+								asn1_free_tsssp(ts_rg_creds, ASN1_PDU_TSREMOTEGUARDCREDS);
+							}
+						}
+
+						asn1_free_tsssp(ts_creds, ASN1_PDU_TSCREDENTIALS);
+					}
+
+					free(pvDecrypted);
+				}
+			}
+
+			if (ts_response.Flags != 0)
+			{
+				ULONG cbResponse = 0;
+				PVOID pvResponse = NULL;
+
+				if (asn1_encode_tsssp(&ts_response, ASN1_PDU_TSREQUEST, &pvResponse, &cbResponse))
+				{
+					*ppvResponse = pvResponse;
+					*pcbResponse = cbResponse;
+
+					result = TRUE;
+				}
+
+				if (ts_response.PubKeyAuth.value != NULL)
+					free(ts_response.PubKeyAuth.value);
+
+				NegoData* current = ts_response.NegoTokens;
+
+				while (current != NULL)
+				{
+					NegoData* next = current->Next;
+
+					free(current->NegoToken.value);
+					free(current);
+
+					current = next;
+				}
 			}
 		}
 
